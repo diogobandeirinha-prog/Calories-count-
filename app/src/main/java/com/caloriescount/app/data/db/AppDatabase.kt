@@ -9,14 +9,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [FoodEntryEntity::class, FavoriteFoodEntity::class],
-    version = 3,
+    entities = [FoodEntryEntity::class, FavoriteFoodEntity::class, WorkoutEntity::class],
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun foodEntryDao(): FoodEntryDao
     abstract fun favoriteFoodDao(): FavoriteFoodDao
+    abstract fun workoutDao(): WorkoutDao
 
     companion object {
         @Volatile
@@ -65,13 +66,34 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 → v4: workout log (drives dynamic daily goal recalibration). */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS workouts (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        timestamp INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        durationMin INTEGER NOT NULL,
+                        intensity TEXT NOT NULL,
+                        caloriesBurned REAL NOT NULL,
+                        proteinBonusG REAL NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_workouts_timestamp ON workouts(timestamp)")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "calories_count.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+                    .also { INSTANCE = it }
             }
     }
 }

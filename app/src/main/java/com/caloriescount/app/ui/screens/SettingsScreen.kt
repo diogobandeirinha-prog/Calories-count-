@@ -14,7 +14,9 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -36,12 +38,18 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.caloriescount.app.domain.TargetCalculator
 import com.caloriescount.app.ui.viewmodel.AppViewModelFactory
+import com.caloriescount.app.ui.viewmodel.OnboardingViewModel
 import com.caloriescount.app.ui.viewmodel.SettingsViewModel
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = AppViewModelFactory)) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel = viewModel(factory = AppViewModelFactory),
+    onboardingViewModel: OnboardingViewModel = viewModel(factory = AppViewModelFactory)
+) {
     val settings by viewModel.settings.collectAsState()
+    val profileState by onboardingViewModel.state.collectAsState()
     val snackbarHost = remember { SnackbarHostState() }
 
     var apiKey by remember(settings.apiKey) { mutableStateOf(settings.apiKey) }
@@ -66,6 +74,33 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = AppViewMod
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
+            profileState?.let { ps ->
+                val targets = TargetCalculator.compute(ps.profile)
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Profile & goal", style = MaterialTheme.typography.titleMedium)
+                        Text(ps.profile.goal.label, fontWeight = FontWeight.Bold)
+                        Text(
+                            "${ps.profile.sex.label} · ${ps.profile.age} yrs · " +
+                                "${ps.profile.heightCm.toInt()} cm · ${ps.profile.weightKg.toInt()} kg · " +
+                                ps.profile.activityLevel.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                        Text(
+                            "Baseline (Mifflin-St Jeor): ${targets.calorieTargetRounded} kcal · " +
+                                "${targets.proteinTargetRounded} g protein",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        OutlinedButton(
+                            onClick = { onboardingViewModel.editProfile() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Edit profile & recalculate") }
+                    }
+                }
+            }
 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

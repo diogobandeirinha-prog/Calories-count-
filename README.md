@@ -20,6 +20,14 @@ weekly and monthly** totals.
    into structured entries — resolving household measures (“a cup”) to grams and
    estimating calories + macros for each food.
 
+### 🎯 Onboarding & dynamic goals
+On first launch a multi-step onboarding collects your **goal** (aggressive fat loss /
+lean muscle gain / weight maintenance), body stats and activity level, then computes
+**baseline calorie + protein targets** with the **Mifflin-St Jeor** equation
+(`domain/TargetCalculator.kt`). Log an **intense workout** and the app **recalibrates
+that day's remaining goals** — the burned calories are added back to your allowance and
+a protein bonus is added to your protein goal, updating "remaining" in real time.
+
 ### Review & track
 3. Either way, you **review and edit** the breakdown before saving — AI
    estimates are approximate, so adjusting the numbers gives you precise totals.
@@ -116,6 +124,9 @@ Single-module app, MVVM, 100% Jetpack Compose (Material 3).
 |-------|--------|
 | UI | `ui/AppRoot.kt` (bottom-nav scaffold), `ui/screens/*` (Capture, History, Settings), `ui/components/*` |
 | ViewModel | `CaptureViewModel`, `StatsViewModel`, `SettingsViewModel` |
+| Onboarding | `OnboardingScreen` (4-step) + `OnboardingViewModel`; gated in `AppRoot` |
+| Profile | `data/model/UserProfile.kt`, `data/prefs/ProfileRepository.kt` (DataStore), `domain/TargetCalculator.kt` (Mifflin-St Jeor) |
+| Workouts | `data/db/WorkoutEntity` + `WorkoutDao` + `WorkoutRepository`; `DayGoals` recalibration in `StatsViewModel` |
 | Data | Room (`data/db/*`), DataStore (`data/prefs/*`), Claude API (`data/remote/*`), remote sync (`data/remote/sync/*`), `FoodRepository` |
 | Sync | `data/sync/*` — `SyncManager` (enqueue) + `FoodSyncWorker` (CoroutineWorker) |
 | Stats | `data/repository/NutritionStats.kt` buckets entries into day/week/month in the device time zone |

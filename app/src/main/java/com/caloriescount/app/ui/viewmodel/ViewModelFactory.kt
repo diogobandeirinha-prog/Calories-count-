@@ -15,9 +15,18 @@ val AppViewModelFactory = viewModelFactory {
     }
     initializer {
         val container = app(this).container
-        StatsViewModel(container.foodRepository, container.settingsRepository)
+        StatsViewModel(
+            container.foodRepository,
+            container.workoutRepository,
+            container.settingsRepository,
+            container.profileRepository
+        )
     }
     initializer {
         SettingsViewModel(app(this).container.settingsRepository)
+    }
+    initializer {
+        val container = app(this).container
+        OnboardingViewModel(container.profileRepository, container.settingsRepository)
     }
 }

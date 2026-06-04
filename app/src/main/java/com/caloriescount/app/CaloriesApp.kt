@@ -2,11 +2,13 @@ package com.caloriescount.app
 
 import android.app.Application
 import com.caloriescount.app.data.db.AppDatabase
+import com.caloriescount.app.data.prefs.ProfileRepository
 import com.caloriescount.app.data.prefs.SettingsRepository
 import com.caloriescount.app.data.remote.ClaudeClient
 import com.caloriescount.app.data.remote.sync.HttpFoodSyncApi
 import com.caloriescount.app.data.remote.sync.RemoteFoodApi
 import com.caloriescount.app.data.repository.FoodRepository
+import com.caloriescount.app.data.repository.WorkoutRepository
 import com.caloriescount.app.data.sync.SyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +38,11 @@ class AppContainer(app: Application) {
     @Volatile private var cachedApiKey: String = ""
 
     val settingsRepository: SettingsRepository = SettingsRepository(app)
+    val profileRepository: ProfileRepository = ProfileRepository(app)
     val claudeClient: ClaudeClient = ClaudeClient()
     val syncManager: SyncManager = SyncManager(app)
+
+    val workoutRepository: WorkoutRepository = WorkoutRepository(db.workoutDao())
 
     private val remoteApi: RemoteFoodApi = HttpFoodSyncApi(
         baseUrlProvider = { cachedSyncUrl },
