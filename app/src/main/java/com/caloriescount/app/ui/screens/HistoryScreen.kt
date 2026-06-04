@@ -122,8 +122,14 @@ private fun PeriodCard(summary: PeriodSummary, onDelete: (FoodEntryEntity) -> Un
                 Column {
                     Text(summary.label, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "${summary.totals.calories.asKcal()}  •  ${summary.totals.protein.asGrams()} protein",
-                        style = MaterialTheme.typography.bodyMedium,
+                        summary.totals.calories.asKcal(),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "P ${summary.totals.protein.asGrams()} • " +
+                            "C ${summary.totals.carbs.asGrams()} • F ${summary.totals.fats.asGrams()}",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -153,8 +159,13 @@ private fun MealRow(entry: FoodEntryEntity, onDelete: (FoodEntryEntity) -> Unit)
         Column(Modifier.weight(1f)) {
             Text(entry.mealName, style = MaterialTheme.typography.bodyLarge)
             Text(
-                "${timeFormat.format(Date(entry.timestamp))}  •  " +
-                    "${entry.totalCalories.asKcal()}, ${entry.totalProteinG.asGrams()} protein",
+                "${timeFormat.format(Date(entry.timestamp))}  •  ${entry.totalCalories.asKcal()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "P ${entry.totalProteinG.asGrams()} • C ${entry.totalCarbsG.asGrams()} • " +
+                    "F ${entry.totalFatsG.asGrams()}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

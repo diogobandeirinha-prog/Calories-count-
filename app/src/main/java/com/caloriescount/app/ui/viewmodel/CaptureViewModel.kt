@@ -9,6 +9,7 @@ import com.caloriescount.app.data.model.FoodItem
 import com.caloriescount.app.data.prefs.SettingsRepository
 import com.caloriescount.app.data.remote.AnalysisOutcome
 import com.caloriescount.app.data.remote.ClaudeClient
+import com.caloriescount.app.data.remote.NutritionAnalysis
 import com.caloriescount.app.data.repository.FoodRepository
 import com.caloriescount.app.util.ImageUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,15 +19,23 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** A nutrition line the user can edit before saving. */
+/** A nutrition line the user can edit before saving. Numeric fields are text for editing. */
 data class EditableItem(
     val name: String,
     val quantity: String,
+    val weight: String,
     val calories: String,
-    val protein: String
+    val protein: String,
+    val carbs: String,
+    val fats: String
 ) {
-    val caloriesValue: Double get() = calories.replace(',', '.').toDoubleOrNull() ?: 0.0
-    val proteinValue: Double get() = protein.replace(',', '.').toDoubleOrNull() ?: 0.0
+    val weightValue: Double get() = weight.parseNum()
+    val caloriesValue: Double get() = calories.parseNum()
+    val proteinValue: Double get() = protein.parseNum()
+    val carbsValue: Double get() = carbs.parseNum()
+    val fatsValue: Double get() = fats.parseNum()
+
+    private fun String.parseNum(): Double = replace(',', '.').toDoubleOrNull() ?: 0.0
 }
 
 enum class CaptureStage { Empty, ReadyToAnalyze, Analyzing, Reviewing }
@@ -38,10 +47,14 @@ data class CaptureUiState(
     val items: List<EditableItem> = emptyList(),
     val errorMessage: String? = null,
     val savedMessage: String? = null,
-    val hasApiKey: Boolean = true
+    val hasApiKey: Boolean = true,
+    /** True while a voice entry is being reviewed (no photo to persist). */
+    val fromVoice: Boolean = false
 ) {
     val totalCalories: Double get() = items.sumOf { it.caloriesValue }
     val totalProtein: Double get() = items.sumOf { it.proteinValue }
+    val totalCarbs: Double get() = items.sumOf { it.carbsValue }
+    val totalFats: Double get() = items.sumOf { it.fatsValue }
 }
 
 class CaptureViewModel(
@@ -53,7 +66,7 @@ class CaptureViewModel(
     private val _state = MutableStateFlow(CaptureUiState())
     val state: StateFlow<CaptureUiState> = _state.asStateFlow()
 
-    /** The downscaled bitmap kept around for analysis + thumbnail persistence. */
+    /** The downscaled bitmap kept around for analysis + thumbnail persistence (photo path only). */
     private var workingBitmap: Bitmap? = null
 
     fun onPhotoPicked(context: Context, uri: Uri) {
@@ -65,56 +78,77 @@ class CaptureViewModel(
             }
             workingBitmap = bitmap
             _state.update {
-                it.copy(stage = CaptureStage.ReadyToAnalyze, errorMessage = null, savedMessage = null)
+                it.copy(
+                    stage = CaptureStage.ReadyToAnalyze,
+                    fromVoice = false,
+                    errorMessage = null,
+                    savedMessage = null
+                )
             }
         }
     }
 
-    fun hasPhoto(): Boolean = workingBitmap != null
-
+    /** Analyze the selected photo. */
     fun analyze() {
         val bitmap = workingBitmap ?: return
+        runAnalysis(previousStage = CaptureStage.ReadyToAnalyze, fromVoice = false) { current ->
+            claude.analyzePhoto(current.apiKey, current.model, ImageUtils.encode(bitmap))
+        }
+    }
+
+    /** Analyze a transcribed spoken meal (voice logging). */
+    fun analyzeVoice(transcript: String) {
+        workingBitmap = null
+        runAnalysis(previousStage = CaptureStage.Empty, fromVoice = true) { current ->
+            claude.analyzeText(current.apiKey, current.model, transcript)
+        }
+    }
+
+    private fun runAnalysis(
+        previousStage: CaptureStage,
+        fromVoice: Boolean,
+        call: suspend (com.caloriescount.app.data.prefs.Settings) -> AnalysisOutcome
+    ) {
         viewModelScope.launch {
             val current = settings.settings.first()
             if (!current.hasApiKey) {
                 _state.update {
                     it.copy(
                         hasApiKey = false,
-                        errorMessage = "Add your Claude API key in Settings to analyze photos."
+                        errorMessage = "Add your Claude API key in Settings to use AI logging."
                     )
                 }
                 return@launch
             }
-            _state.update { it.copy(stage = CaptureStage.Analyzing, errorMessage = null) }
+            _state.update { it.copy(stage = CaptureStage.Analyzing, fromVoice = fromVoice, errorMessage = null) }
 
-            val encoded = ImageUtils.encode(bitmap)
-            when (val outcome = claude.analyzePhoto(current.apiKey, current.model, encoded)) {
-                is AnalysisOutcome.Success -> {
-                    val a = outcome.analysis
-                    _state.update {
-                        it.copy(
-                            stage = CaptureStage.Reviewing,
-                            mealName = a.mealName,
-                            notes = a.notes,
-                            items = a.items.map { item ->
-                                EditableItem(
-                                    name = item.name,
-                                    quantity = item.quantity,
-                                    calories = formatNumber(item.calories),
-                                    protein = formatNumber(item.proteinG)
-                                )
-                            }.ifEmpty {
-                                listOf(EditableItem("", "", formatNumber(a.totalCalories), formatNumber(a.totalProteinG)))
-                            }
-                        )
-                    }
-                }
+            when (val outcome = call(current)) {
+                is AnalysisOutcome.Success -> _state.update { it.toReviewing(outcome.analysis) }
                 is AnalysisOutcome.Error -> _state.update {
-                    it.copy(stage = CaptureStage.ReadyToAnalyze, errorMessage = outcome.message)
+                    it.copy(stage = previousStage, errorMessage = outcome.message)
                 }
             }
         }
     }
+
+    private fun CaptureUiState.toReviewing(a: NutritionAnalysis): CaptureUiState = copy(
+        stage = CaptureStage.Reviewing,
+        mealName = a.mealName,
+        notes = a.notes,
+        items = a.items.map { item ->
+            EditableItem(
+                name = item.name,
+                quantity = item.quantity,
+                weight = num(item.weightGrams),
+                calories = num(item.calories),
+                protein = num(item.proteinG),
+                carbs = num(item.carbsG),
+                fats = num(item.fatsG)
+            )
+        }.ifEmpty {
+            listOf(EditableItem("", "", num(0.0), num(a.totalCalories), num(a.totalProteinG), num(a.totalCarbsG), num(a.totalFatsG)))
+        }
+    )
 
     fun updateMealName(value: String) = _state.update { it.copy(mealName = value) }
     fun updateNotes(value: String) = _state.update { it.copy(notes = value) }
@@ -124,7 +158,7 @@ class CaptureViewModel(
     }
 
     fun addItem() = _state.update {
-        it.copy(items = it.items + EditableItem("", "", "", ""))
+        it.copy(items = it.items + EditableItem("", "", "", "", "", "", ""))
     }
 
     fun removeItem(index: Int) = _state.update {
@@ -143,8 +177,11 @@ class CaptureViewModel(
                 FoodItem(
                     name = it.name.ifBlank { "Item" },
                     quantity = it.quantity,
+                    weightGrams = it.weightValue,
                     calories = it.caloriesValue,
-                    proteinG = it.proteinValue
+                    proteinG = it.proteinValue,
+                    carbsG = it.carbsValue,
+                    fatsG = it.fatsValue
                 )
             }
             repository.addEntry(
@@ -167,6 +204,6 @@ class CaptureViewModel(
 
     fun consumeMessages() = _state.update { it.copy(errorMessage = null, savedMessage = null) }
 
-    private fun formatNumber(value: Double): String =
+    private fun num(value: Double): String =
         if (value == value.toLong().toDouble()) value.toLong().toString() else "%.1f".format(value)
 }

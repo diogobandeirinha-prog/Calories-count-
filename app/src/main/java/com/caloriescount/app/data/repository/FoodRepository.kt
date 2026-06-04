@@ -23,6 +23,8 @@ class FoodRepository(private val dao: FoodEntryDao) {
             mealName = mealName.ifBlank { "Meal" },
             totalCalories = items.sumOf { it.calories },
             totalProteinG = items.sumOf { it.proteinG },
+            totalCarbsG = items.sumOf { it.carbsG },
+            totalFatsG = items.sumOf { it.fatsG },
             items = items,
             notes = notes,
             photoPath = photoPath

@@ -21,7 +21,8 @@ data class Settings(
     val hasApiKey: Boolean get() = apiKey.isNotBlank()
 
     companion object {
-        const val DEFAULT_MODEL = "claude-sonnet-4-6"
+        // Opus 4.8 — most capable model, best accuracy for portion/macro estimation.
+        const val DEFAULT_MODEL = "claude-opus-4-8"
     }
 }
 

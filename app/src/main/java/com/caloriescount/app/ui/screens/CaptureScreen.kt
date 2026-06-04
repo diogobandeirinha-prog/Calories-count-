@@ -1,7 +1,10 @@
 package com.caloriescount.app.ui.screens
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.net.Uri
+import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,12 +20,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.Button
@@ -47,7 +50,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -104,6 +106,36 @@ fun CaptureScreen(
         }
     }
 
+    // Voice logging: launch the system speech recognizer, then parse the transcript.
+    val speechLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val transcript = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+                .orEmpty()
+            previewUri = null
+            viewModel.analyzeVoice(transcript)
+        }
+    }
+    val launchSpeech = {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what you ate, e.g. '150 g grilled chicken and a cup of rice'")
+        }
+        runCatching { speechLauncher.launch(intent) }
+            .onFailure { /* surfaced below via the snackbar if no recognizer */ }
+            .isSuccess
+    }
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted && !launchSpeech()) {
+            // ActivityNotFound etc. — no speech recognizer available
+        }
+    }
+
     LaunchedEffect(state.errorMessage, state.savedMessage) {
         state.errorMessage?.let { snackbarHost.showSnackbar(it) }
         state.savedMessage?.let { snackbarHost.showSnackbar(it) }
@@ -121,13 +153,13 @@ fun CaptureScreen(
         ) {
             Text("Log a meal", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
-            PhotoArea(previewUri = previewUri, stage = state.stage)
+            if (!state.fromVoice) {
+                PhotoArea(previewUri = previewUri)
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
-                    onClick = {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    },
+                    onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Filled.CameraAlt, null)
@@ -148,6 +180,15 @@ fun CaptureScreen(
                 }
             }
 
+            OutlinedButton(
+                onClick = { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Filled.Mic, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Speak a meal")
+            }
+
             when (state.stage) {
                 CaptureStage.ReadyToAnalyze -> Button(
                     onClick = viewModel::analyze,
@@ -161,13 +202,14 @@ fun CaptureScreen(
                 ) {
                     CircularProgressIndicator(Modifier.height(20.dp).width(20.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(12.dp))
-                    Text("Estimating calories & protein…")
+                    Text(if (state.fromVoice) "Parsing your meal…" else "Estimating calories & macros…")
                 }
 
                 CaptureStage.Reviewing -> ReviewSection(state, viewModel, onSaved)
                 CaptureStage.Empty -> Text(
-                    "Take or pick a photo of your dish. The app estimates the calories and protein, " +
-                        "and you can fine-tune the numbers before saving.",
+                    "Snap a photo of your dish, or tap “Speak a meal” and describe what you ate. " +
+                        "The app estimates each ingredient's weight, calories and macros, and you can " +
+                        "fine-tune the numbers before saving.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -177,7 +219,7 @@ fun CaptureScreen(
 }
 
 @Composable
-private fun PhotoArea(previewUri: Uri?, stage: CaptureStage) {
+private fun PhotoArea(previewUri: Uri?) {
     ElevatedCard(
         Modifier
             .fillMaxWidth()
@@ -237,16 +279,18 @@ private fun ReviewSection(
     }
 
     ElevatedCard(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+        Column(Modifier.padding(16.dp)) {
             Text("Total", fontWeight = FontWeight.Bold)
             Text(
-                "${state.totalCalories.asKcal()}  •  ${state.totalProtein.asGrams()} protein",
+                "${state.totalCalories.asKcal()}",
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Protein ${state.totalProtein.asGrams()}  •  " +
+                    "Carbs ${state.totalCarbs.asGrams()}  •  Fats ${state.totalFats.asGrams()}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -292,34 +336,75 @@ private fun ItemEditor(
                     Icon(Icons.Filled.Delete, contentDescription = "Remove", tint = Color(0xFFC62828))
                 }
             }
-            OutlinedTextField(
-                value = item.quantity,
-                onValueChange = { onChange(item.copy(quantity = it)) },
-                label = { Text("Quantity (e.g. 150 g)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-            )
             Row(
                 Modifier.fillMaxWidth().padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
-                    value = item.calories,
-                    onValueChange = { onChange(item.copy(calories = it.filter { c -> c.isDigit() || c == '.' || c == ',' })) },
-                    label = { Text("Calories") },
+                    value = item.quantity,
+                    onValueChange = { onChange(item.copy(quantity = it)) },
+                    label = { Text("Quantity") },
                     singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f)
                 )
-                OutlinedTextField(
+                NumberField(
+                    value = item.weight,
+                    label = "Weight (g)",
+                    onValueChange = { onChange(item.copy(weight = it)) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                NumberField(
+                    value = item.calories,
+                    label = "Calories",
+                    onValueChange = { onChange(item.copy(calories = it)) },
+                    modifier = Modifier.weight(1f)
+                )
+                NumberField(
                     value = item.protein,
-                    onValueChange = { onChange(item.copy(protein = it.filter { c -> c.isDigit() || c == '.' || c == ',' })) },
-                    label = { Text("Protein (g)") },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                    label = "Protein (g)",
+                    onValueChange = { onChange(item.copy(protein = it)) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                NumberField(
+                    value = item.carbs,
+                    label = "Carbs (g)",
+                    onValueChange = { onChange(item.copy(carbs = it)) },
+                    modifier = Modifier.weight(1f)
+                )
+                NumberField(
+                    value = item.fats,
+                    label = "Fats (g)",
+                    onValueChange = { onChange(item.copy(fats = it)) },
                     modifier = Modifier.weight(1f)
                 )
             }
         }
     }
+}
+
+@Composable
+private fun NumberField(
+    value: String,
+    label: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { onValueChange(it.filter { c -> c.isDigit() || c == '.' || c == ',' }) },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = modifier
+    )
 }

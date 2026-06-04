@@ -1,18 +1,47 @@
 # Calories Count
 
-An Android app that estimates the **calories** and **protein** in a dish from a
-photo, lets you fine-tune the numbers, and tracks your **daily, weekly and
-monthly** totals.
+An Android app that estimates the **calories** and **macronutrients
+(protein, carbs, fats)** of a meal — from a **photo** *or* a **spoken
+description** — lets you fine-tune the numbers, and tracks your **daily,
+weekly and monthly** totals.
 
 ## How it works
 
+### 📷 Photo (vision) logging
 1. **Snap or pick a photo** of your meal (Camera or Gallery).
-2. The photo is sent to **Anthropic's Claude vision model**, which identifies
-   each component of the dish and estimates its portion, calories and protein.
-3. You **review and edit** the breakdown before saving — photo estimates are
-   approximate, so adjusting the numbers gives you precise daily totals.
-4. The **Stats** tab sums everything up for **Today**, and shows breakdowns by
+2. The photo goes to **Claude's vision model**, which identifies each distinct
+   **ingredient**, estimates its **weight in grams**, and returns precise
+   **calories, protein, carbs and fats** per item plus meal totals.
+
+### 🎙️ Voice logging
+1. Tap **“Speak a meal”** and say something like
+   *“I had 150 grams of grilled chicken breast and a cup of cooked white rice.”*
+2. Android's speech recognizer transcribes it; **Claude parses the transcript**
+   into structured entries — resolving household measures (“a cup”) to grams and
+   estimating calories + macros for each food.
+
+### Review & track
+3. Either way, you **review and edit** the breakdown before saving — AI
+   estimates are approximate, so adjusting the numbers gives you precise totals.
+4. The **Stats** tab sums everything for **Today** and breaks it down by
    **day, week and month**, with progress bars against your daily goals.
+
+## Claude API design
+
+Both the photo and voice paths hit Anthropic's Messages API (`/v1/messages`)
+with:
+
+- **Model `claude-opus-4-8`** — the most capable model, for best
+  portion/macro accuracy (configurable in Settings).
+- **Adaptive thinking** (`thinking: {type: "adaptive"}`) + **`effort: "high"`** —
+  the model reasons about portions before answering.
+- **Structured outputs** (`output_config.format` with a JSON schema) — the
+  response is guaranteed-valid JSON matching the app's nutrition model, so there
+  is no brittle text parsing.
+
+> Prompt caching is intentionally **not** used: the system prompt is well under
+> the model's ~4 K-token minimum cacheable prefix, so a cache breakpoint would
+> never actually engage.
 
 ## Setup
 
@@ -70,3 +99,5 @@ Single-module app, MVVM, 100% Jetpack Compose (Material 3).
 
 - Meal data and the API key live only on the device (local DB + DataStore).
 - Photos are downscaled and sent to Anthropic solely to produce the estimate.
+- Voice is transcribed on-device by Android's speech recognizer; only the
+  resulting **text** is sent to Anthropic — never the audio.

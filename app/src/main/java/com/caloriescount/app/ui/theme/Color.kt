@@ -11,3 +11,5 @@ val Orange80 = Color(0xFFFFB74D)
 
 val ProteinColor = Color(0xFF1565C0)
 val CalorieColor = Color(0xFFEF6C00)
+val CarbColor = Color(0xFF6A1B9A)
+val FatColor = Color(0xFFAD1457)

@@ -16,6 +16,8 @@ data class FoodEntryEntity(
     val mealName: String,
     val totalCalories: Double,
     val totalProteinG: Double,
+    val totalCarbsG: Double = 0.0,
+    val totalFatsG: Double = 0.0,
     val items: List<FoodItem>,
     val notes: String = "",
     /** Local file path or content uri of the saved photo, if any. */

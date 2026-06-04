@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.caloriescount.app.data.repository.Totals
 import com.caloriescount.app.ui.theme.CalorieColor
+import com.caloriescount.app.ui.theme.CarbColor
+import com.caloriescount.app.ui.theme.FatColor
 import com.caloriescount.app.ui.theme.ProteinColor
 import kotlin.math.roundToInt
 
@@ -52,6 +54,8 @@ fun TotalsCard(
             ) {
                 Metric("Calories", totals.calories.asKcal(), CalorieColor)
                 Metric("Protein", totals.protein.asGrams(), ProteinColor)
+                Metric("Carbs", totals.carbs.asGrams(), CarbColor)
+                Metric("Fats", totals.fats.asGrams(), FatColor)
             }
             if (calorieGoal != null && calorieGoal > 0) {
                 GoalBar("Calorie goal", totals.calories, calorieGoal, CalorieColor)
@@ -66,8 +70,8 @@ fun TotalsCard(
 @Composable
 private fun Metric(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = color)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

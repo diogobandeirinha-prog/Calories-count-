@@ -7,10 +7,12 @@ import java.time.ZoneId
 import java.time.temporal.WeekFields
 import java.util.Locale
 
-/** Aggregated calories + protein over a set of entries. */
+/** Aggregated calories + macronutrients over a set of entries. */
 data class Totals(
     val calories: Double = 0.0,
     val protein: Double = 0.0,
+    val carbs: Double = 0.0,
+    val fats: Double = 0.0,
     val entryCount: Int = 0
 )
 
@@ -108,6 +110,8 @@ object NutritionStats {
     private fun List<FoodEntryEntity>.toTotals() = Totals(
         calories = sumOf { it.totalCalories },
         protein = sumOf { it.totalProteinG },
+        carbs = sumOf { it.totalCarbsG },
+        fats = sumOf { it.totalFatsG },
         entryCount = size
     )
 

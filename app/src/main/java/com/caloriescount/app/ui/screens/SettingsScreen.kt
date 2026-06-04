@@ -70,9 +70,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = AppViewMod
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Claude API", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "The app uses Anthropic's Claude vision model to estimate calories and protein " +
-                            "from your photos. Get a key at console.anthropic.com and paste it below. " +
-                            "It is stored only on this device.",
+                        "The app uses Anthropic's Claude model to estimate calories and macros " +
+                            "(protein, carbs, fats) from your food photos and spoken meal descriptions. " +
+                            "Get a key at console.anthropic.com and paste it below. The default model " +
+                            "is Claude Opus 4.8 (most accurate). It is stored only on this device.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
