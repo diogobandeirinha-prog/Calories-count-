@@ -14,6 +14,13 @@ class Converters {
     fun toFoodItems(value: String): List<FoodItem> =
         if (value.isBlank()) emptyList() else json.decodeFromString(value)
 
+    @TypeConverter
+    fun fromSyncStatus(status: SyncStatus): String = status.name
+
+    @TypeConverter
+    fun toSyncStatus(value: String): SyncStatus =
+        runCatching { SyncStatus.valueOf(value) }.getOrDefault(SyncStatus.PENDING)
+
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
     }

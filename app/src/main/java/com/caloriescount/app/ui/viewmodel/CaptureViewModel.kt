@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.caloriescount.app.data.db.FavoriteFoodEntity
 import com.caloriescount.app.data.model.FoodItem
 import com.caloriescount.app.data.prefs.SettingsRepository
 import com.caloriescount.app.data.remote.AnalysisOutcome
@@ -13,9 +14,11 @@ import com.caloriescount.app.data.remote.NutritionAnalysis
 import com.caloriescount.app.data.repository.FoodRepository
 import com.caloriescount.app.util.ImageUtils
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -66,8 +69,33 @@ class CaptureViewModel(
     private val _state = MutableStateFlow(CaptureUiState())
     val state: StateFlow<CaptureUiState> = _state.asStateFlow()
 
+    /** Cached frequent/favorite foods for one-tap logging. */
+    val favorites: StateFlow<List<FavoriteFoodEntity>> = repository.observeFavorites(limit = 8)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     /** The downscaled bitmap kept around for analysis + thumbnail persistence (photo path only). */
     private var workingBitmap: Bitmap? = null
+
+    /** One-tap log: jump straight to review with this cached food prefilled. */
+    fun startFromFavorite(fav: FavoriteFoodEntity) {
+        workingBitmap = null
+        _state.value = CaptureUiState(
+            stage = CaptureStage.Reviewing,
+            fromVoice = false,
+            mealName = fav.name,
+            items = listOf(
+                EditableItem(
+                    name = fav.name,
+                    quantity = fav.quantity,
+                    weight = num(fav.weightGrams),
+                    calories = num(fav.calories),
+                    protein = num(fav.proteinG),
+                    carbs = num(fav.carbsG),
+                    fats = num(fav.fatsG)
+                )
+            )
+        )
+    }
 
     fun onPhotoPicked(context: Context, uri: Uri) {
         viewModelScope.launch {

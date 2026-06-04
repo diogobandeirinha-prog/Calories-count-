@@ -26,6 +26,10 @@ class StatsViewModel(
     val settings: StateFlow<Settings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Settings())
 
+    /** Number of locally-logged entries still waiting to sync to the server. */
+    val pendingSyncCount: StateFlow<Int> = repository.observePendingSyncCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     fun delete(entry: FoodEntryEntity) {
         viewModelScope.launch { repository.delete(entry) }
     }

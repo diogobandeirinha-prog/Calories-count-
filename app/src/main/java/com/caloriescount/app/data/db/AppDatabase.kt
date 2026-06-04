@@ -8,10 +8,15 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [FoodEntryEntity::class], version = 2, exportSchema = false)
+@Database(
+    entities = [FoodEntryEntity::class, FavoriteFoodEntity::class],
+    version = 3,
+    exportSchema = false
+)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun foodEntryDao(): FoodEntryDao
+    abstract fun favoriteFoodDao(): FavoriteFoodDao
 
     companion object {
         @Volatile
@@ -25,13 +30,48 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 → v3: offline-first sync metadata + favorite/frequent foods cache. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Existing rows are treated as already-synced so they don't flood the queue.
+                db.execSQL("ALTER TABLE food_entries ADD COLUMN remoteId TEXT")
+                db.execSQL("ALTER TABLE food_entries ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'SYNCED'")
+                db.execSQL("ALTER TABLE food_entries ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE food_entries ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_food_entries_syncStatus ON food_entries(syncStatus)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_food_entries_timestamp ON food_entries(timestamp)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS favorite_foods (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        nameKey TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        quantity TEXT NOT NULL DEFAULT '',
+                        weightGrams REAL NOT NULL DEFAULT 0,
+                        calories REAL NOT NULL DEFAULT 0,
+                        proteinG REAL NOT NULL DEFAULT 0,
+                        carbsG REAL NOT NULL DEFAULT 0,
+                        fatsG REAL NOT NULL DEFAULT 0,
+                        useCount INTEGER NOT NULL DEFAULT 0,
+                        lastUsedAt INTEGER NOT NULL DEFAULT 0,
+                        pinned INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_favorite_foods_nameKey ON favorite_foods(nameKey)"
+                )
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "calories_count.db"
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
     }
 }

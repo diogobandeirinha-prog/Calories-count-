@@ -48,6 +48,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = AppViewMod
     var model by remember(settings.model) { mutableStateOf(settings.model) }
     var calorieGoal by remember(settings.calorieGoal) { mutableStateOf(settings.calorieGoal.toInt().toString()) }
     var proteinGoal by remember(settings.proteinGoal) { mutableStateOf(settings.proteinGoal.toInt().toString()) }
+    var syncUrl by remember(settings.syncBaseUrl) { mutableStateOf(settings.syncBaseUrl) }
     var showKey by remember { mutableStateOf(false) }
     var savedTick by remember { mutableStateOf(0) }
 
@@ -127,6 +128,26 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = AppViewMod
                 }
             }
 
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Sync server (optional)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Meals are always saved on the device first. If you set a server URL, logs " +
+                            "queue locally while offline and sync automatically once a stable connection " +
+                            "returns. Leave blank to keep everything local-only.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = syncUrl,
+                        onValueChange = { syncUrl = it },
+                        label = { Text("Base URL, e.g. https://api.example.com") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
             Button(
                 onClick = {
                     viewModel.saveApiKey(apiKey)
@@ -135,6 +156,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = AppViewMod
                         calorieGoal.toDoubleOrNull() ?: 2000.0,
                         proteinGoal.toDoubleOrNull() ?: 120.0
                     )
+                    viewModel.saveSyncBaseUrl(syncUrl)
                     savedTick++
                 },
                 modifier = Modifier.fillMaxWidth()

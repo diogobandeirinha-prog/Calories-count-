@@ -74,6 +74,40 @@ Requirements:
 > compiled/verified there. Build it once in Android Studio (which has the SDK)
 > to generate the Gradle/AGP caches.
 
+## Local persistence & offline-first sync
+
+The app is **offline-first**: every read is a local Room `Flow` and every write hits
+the local database before anything touches the network.
+
+- **Room database** (`data/db/`) with a clean **Repository** seam (`FoodRepository`) —
+  the single source of truth. CRUD on the macro history is **real-time**: screens
+  observe `Flow`s, and daily / weekly / monthly buckets are computed in
+  `NutritionStats` in the device's time zone.
+- **Favorite / frequent foods cache** (`favorite_foods` table): every logged item
+  bumps a `useCount`; the Add screen surfaces your most-used foods as one-tap chips,
+  and you can pin explicit favorites.
+- **Sync metadata** on each entry (`syncStatus`, `remoteId`, `deleted`, `updatedAt`).
+  New/edited rows are `PENDING`; deletes of already-synced rows become tombstones so
+  the remote delete can be replayed.
+- **WorkManager sync** (`data/sync/`): after each local write the repository enqueues a
+  unique `FoodSyncWorker` constrained to `NetworkType.CONNECTED`. If you log while
+  offline, WorkManager **parks the job and runs it automatically when a stable
+  connection returns** — surviving app restarts and process death — retrying with
+  exponential backoff on failure. The worker drains all `PENDING` rows through a
+  pluggable `RemoteFoodApi` (`HttpFoodSyncApi` talks REST to the **Sync server URL**
+  you set in Settings; blank = local-only). The Stats screen shows a live "waiting to
+  sync" count from the DB.
+
+```
+UI (Compose)  ──observes──▶  FoodRepository ──▶ Room (local, source of truth)
+   ▲                              │  on write: mark PENDING + enqueue work
+   │ Flow<…>                      ▼
+NutritionStats            SyncManager ──▶ WorkManager (NetworkType.CONNECTED)
+                                                │ when online
+                                                ▼
+                                       FoodSyncWorker ──▶ RemoteFoodApi ──▶ server
+```
+
 ## Architecture
 
 Single-module app, MVVM, 100% Jetpack Compose (Material 3).
@@ -82,14 +116,16 @@ Single-module app, MVVM, 100% Jetpack Compose (Material 3).
 |-------|--------|
 | UI | `ui/AppRoot.kt` (bottom-nav scaffold), `ui/screens/*` (Capture, History, Settings), `ui/components/*` |
 | ViewModel | `CaptureViewModel`, `StatsViewModel`, `SettingsViewModel` |
-| Data | Room (`data/db/*`), DataStore (`data/prefs/*`), Claude API (`data/remote/*`), `FoodRepository` |
+| Data | Room (`data/db/*`), DataStore (`data/prefs/*`), Claude API (`data/remote/*`), remote sync (`data/remote/sync/*`), `FoodRepository` |
+| Sync | `data/sync/*` — `SyncManager` (enqueue) + `FoodSyncWorker` (CoroutineWorker) |
 | Stats | `data/repository/NutritionStats.kt` buckets entries into day/week/month in the device time zone |
 | Util | `util/ImageUtils.kt` — downscale, EXIF-rotate, JPEG + base64 encode |
 
 ### Tech
 
 - Kotlin 2.0, Jetpack Compose + Material 3
-- Room (KSP) for the meal log
+- Room (KSP) for the meal log + favorites cache
+- WorkManager for offline-first background sync
 - DataStore Preferences for settings
 - OkHttp + kotlinx.serialization for the Anthropic Messages API
 - Coil for image loading

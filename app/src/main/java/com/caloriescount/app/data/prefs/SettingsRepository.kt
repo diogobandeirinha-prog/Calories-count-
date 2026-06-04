@@ -16,9 +16,12 @@ data class Settings(
     val apiKey: String = "",
     val model: String = DEFAULT_MODEL,
     val calorieGoal: Double = 2000.0,
-    val proteinGoal: Double = 120.0
+    val proteinGoal: Double = 120.0,
+    /** Base URL of the remote macro-history server. Blank = sync disabled. */
+    val syncBaseUrl: String = ""
 ) {
     val hasApiKey: Boolean get() = apiKey.isNotBlank()
+    val syncEnabled: Boolean get() = syncBaseUrl.isNotBlank()
 
     companion object {
         // Opus 4.8 — most capable model, best accuracy for portion/macro estimation.
@@ -33,7 +36,8 @@ class SettingsRepository(private val context: Context) {
             apiKey = prefs[KEY_API] ?: "",
             model = prefs[KEY_MODEL] ?: Settings.DEFAULT_MODEL,
             calorieGoal = prefs[KEY_CAL_GOAL] ?: 2000.0,
-            proteinGoal = prefs[KEY_PROTEIN_GOAL] ?: 120.0
+            proteinGoal = prefs[KEY_PROTEIN_GOAL] ?: 120.0,
+            syncBaseUrl = prefs[KEY_SYNC_URL] ?: ""
         )
     }
 
@@ -46,10 +50,14 @@ class SettingsRepository(private val context: Context) {
         it[KEY_PROTEIN_GOAL] = proteinGoal
     }
 
+    suspend fun setSyncBaseUrl(value: String) =
+        context.dataStore.edit { it[KEY_SYNC_URL] = value.trim() }
+
     companion object {
         private val KEY_API = stringPreferencesKey("api_key")
         private val KEY_MODEL = stringPreferencesKey("model")
         private val KEY_CAL_GOAL = doublePreferencesKey("calorie_goal")
         private val KEY_PROTEIN_GOAL = doublePreferencesKey("protein_goal")
+        private val KEY_SYNC_URL = stringPreferencesKey("sync_base_url")
     }
 }

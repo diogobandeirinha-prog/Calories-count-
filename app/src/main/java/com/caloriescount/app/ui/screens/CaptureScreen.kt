@@ -11,6 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -39,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,6 +62,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.caloriescount.app.ui.components.asGrams
 import com.caloriescount.app.ui.components.asKcal
+import com.caloriescount.app.data.db.FavoriteFoodEntity
 import com.caloriescount.app.ui.viewmodel.AppViewModelFactory
 import com.caloriescount.app.ui.viewmodel.CaptureStage
 import com.caloriescount.app.ui.viewmodel.CaptureViewModel
@@ -72,6 +76,7 @@ fun CaptureScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
+    val favorites by viewModel.favorites.collectAsState()
     val snackbarHost = remember { SnackbarHostState() }
 
     var previewUri by remember { mutableStateOf<Uri?>(null) }
@@ -206,12 +211,41 @@ fun CaptureScreen(
                 }
 
                 CaptureStage.Reviewing -> ReviewSection(state, viewModel, onSaved)
-                CaptureStage.Empty -> Text(
-                    "Snap a photo of your dish, or tap “Speak a meal” and describe what you ate. " +
-                        "The app estimates each ingredient's weight, calories and macros, and you can " +
-                        "fine-tune the numbers before saving.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                CaptureStage.Empty -> {
+                    Text(
+                        "Snap a photo of your dish, or tap “Speak a meal” and describe what you ate. " +
+                            "The app estimates each ingredient's weight, calories and macros, and you can " +
+                            "fine-tune the numbers before saving.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (favorites.isNotEmpty()) {
+                        FrequentFoods(favorites, onPick = viewModel::startFromFavorite)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FrequentFoods(
+    favorites: List<FavoriteFoodEntity>,
+    onPick: (FavoriteFoodEntity) -> Unit
+) {
+    Column {
+        Text(
+            "Frequent foods",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            favorites.forEach { fav ->
+                SuggestionChip(
+                    onClick = { onPick(fav) },
+                    label = { Text("${fav.name} · ${fav.calories.asKcal()}") }
                 )
             }
         }

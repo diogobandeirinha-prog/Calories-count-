@@ -18,4 +18,5 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     fun saveModel(value: String) = viewModelScope.launch { repository.setModel(value) }
     fun saveGoals(calorieGoal: Double, proteinGoal: Double) =
         viewModelScope.launch { repository.setGoals(calorieGoal, proteinGoal) }
+    fun saveSyncBaseUrl(value: String) = viewModelScope.launch { repository.setSyncBaseUrl(value) }
 }

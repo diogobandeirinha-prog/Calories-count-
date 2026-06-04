@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -49,10 +51,32 @@ private enum class Period(val label: String) { Daily("Daily"), Weekly("Weekly"),
 fun HistoryScreen(viewModel: StatsViewModel = viewModel(factory = AppViewModelFactory)) {
     val snapshot by viewModel.snapshot.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val pendingSync by viewModel.pendingSyncCount.collectAsState()
     var period by remember { mutableStateOf(Period.Daily) }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Your nutrition", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
+        if (pendingSync > 0) {
+            Row(
+                Modifier.padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Filled.CloudQueue,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
+                Text(
+                    if (settings.syncEnabled) "$pendingSync waiting to sync"
+                    else "$pendingSync saved locally · set a sync server in Settings",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         val snap = snapshot
         if (snap == null) {
