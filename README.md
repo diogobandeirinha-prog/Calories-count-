@@ -1,5 +1,7 @@
 # Calories Count
 
+[![CI](https://github.com/diogobandeirinha-prog/Calories-count-/actions/workflows/ci.yml/badge.svg)](https://github.com/diogobandeirinha-prog/Calories-count-/actions/workflows/ci.yml)
+
 An Android app that estimates the **calories** and **macronutrients
 (protein, carbs, fats)** of a meal — from a **photo** *or* a **spoken
 description** — lets you fine-tune the numbers, and tracks your **daily,
