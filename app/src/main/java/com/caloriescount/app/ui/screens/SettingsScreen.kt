@@ -1,0 +1,208 @@
+package com.caloriescount.app.ui.screens
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.caloriescount.app.domain.TargetCalculator
+import com.caloriescount.app.ui.viewmodel.AppViewModelFactory
+import com.caloriescount.app.ui.viewmodel.OnboardingViewModel
+import com.caloriescount.app.ui.viewmodel.SettingsViewModel
+
+@Composable
+fun SettingsScreen(
+    viewModel: SettingsViewModel = viewModel(factory = AppViewModelFactory),
+    onboardingViewModel: OnboardingViewModel = viewModel(factory = AppViewModelFactory)
+) {
+    val settings by viewModel.settings.collectAsState()
+    val profileState by onboardingViewModel.state.collectAsState()
+    val snackbarHost = remember { SnackbarHostState() }
+
+    var apiKey by remember(settings.apiKey) { mutableStateOf(settings.apiKey) }
+    var model by remember(settings.model) { mutableStateOf(settings.model) }
+    var calorieGoal by remember(settings.calorieGoal) { mutableStateOf(settings.calorieGoal.toInt().toString()) }
+    var proteinGoal by remember(settings.proteinGoal) { mutableStateOf(settings.proteinGoal.toInt().toString()) }
+    var syncUrl by remember(settings.syncBaseUrl) { mutableStateOf(settings.syncBaseUrl) }
+    var showKey by remember { mutableStateOf(false) }
+    var savedTick by remember { mutableStateOf(0) }
+
+    LaunchedEffect(savedTick) {
+        if (savedTick > 0) snackbarHost.showSnackbar("Settings saved.")
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHost) }) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
+            profileState?.let { ps ->
+                val targets = TargetCalculator.compute(ps.profile)
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Profile & goal", style = MaterialTheme.typography.titleMedium)
+                        Text(ps.profile.goal.label, fontWeight = FontWeight.Bold)
+                        Text(
+                            "${ps.profile.sex.label} · ${ps.profile.age} yrs · " +
+                                "${ps.profile.heightCm.toInt()} cm · ${ps.profile.weightKg.toInt()} kg · " +
+                                ps.profile.activityLevel.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                        Text(
+                            "Baseline (Mifflin-St Jeor): ${targets.calorieTargetRounded} kcal · " +
+                                "${targets.proteinTargetRounded} g protein",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        OutlinedButton(
+                            onClick = { onboardingViewModel.editProfile() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Edit profile & recalculate") }
+                    }
+                }
+            }
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Claude API", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "The app uses Anthropic's Claude model to estimate calories and macros " +
+                            "(protein, carbs, fats) from your food photos and spoken meal descriptions. " +
+                            "Get a key at console.anthropic.com and paste it below. The default model " +
+                            "is Claude Opus 4.8 (most accurate). It is stored only on this device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        label = { Text("API key") },
+                        singleLine = true,
+                        visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showKey = !showKey }) {
+                                Icon(
+                                    if (showKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (showKey) "Hide key" else "Show key"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = model,
+                        onValueChange = { model = it },
+                        label = { Text("Model") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Daily goals", style = MaterialTheme.typography.titleMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = calorieGoal,
+                            onValueChange = { calorieGoal = it.filter(Char::isDigit) },
+                            label = { Text("Calories") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = proteinGoal,
+                            onValueChange = { proteinGoal = it.filter(Char::isDigit) },
+                            label = { Text("Protein (g)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Sync server (optional)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Meals are always saved on the device first. If you set a server URL, logs " +
+                            "queue locally while offline and sync automatically once a stable connection " +
+                            "returns. Leave blank to keep everything local-only.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = syncUrl,
+                        onValueChange = { syncUrl = it },
+                        label = { Text("Base URL, e.g. https://api.example.com") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    viewModel.saveApiKey(apiKey)
+                    viewModel.saveModel(model.ifBlank { com.caloriescount.app.data.prefs.Settings.DEFAULT_MODEL })
+                    viewModel.saveGoals(
+                        calorieGoal.toDoubleOrNull() ?: 2000.0,
+                        proteinGoal.toDoubleOrNull() ?: 120.0
+                    )
+                    viewModel.saveSyncBaseUrl(syncUrl)
+                    savedTick++
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Save settings") }
+
+            Text(
+                "Tip: photo estimates are approximate. Review and adjust the numbers when you log a " +
+                    "meal for the most accurate daily, weekly and monthly totals.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
