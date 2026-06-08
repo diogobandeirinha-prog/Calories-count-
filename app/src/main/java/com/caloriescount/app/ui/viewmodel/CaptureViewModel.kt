@@ -51,8 +51,8 @@ data class CaptureUiState(
     val errorMessage: String? = null,
     val savedMessage: String? = null,
     val hasApiKey: Boolean = true,
-    /** True while a voice entry is being reviewed (no photo to persist). */
-    val fromVoice: Boolean = false
+    /** True while a typed/spoken description entry is in flight (no photo to persist). */
+    val fromText: Boolean = false
 ) {
     val totalCalories: Double get() = items.sumOf { it.caloriesValue }
     val totalProtein: Double get() = items.sumOf { it.proteinValue }
@@ -81,7 +81,7 @@ class CaptureViewModel(
         workingBitmap = null
         _state.value = CaptureUiState(
             stage = CaptureStage.Reviewing,
-            fromVoice = false,
+            fromText = false,
             mealName = fav.name,
             items = listOf(
                 EditableItem(
@@ -108,7 +108,7 @@ class CaptureViewModel(
             _state.update {
                 it.copy(
                     stage = CaptureStage.ReadyToAnalyze,
-                    fromVoice = false,
+                    fromText = false,
                     errorMessage = null,
                     savedMessage = null
                 )
@@ -119,22 +119,22 @@ class CaptureViewModel(
     /** Analyze the selected photo. */
     fun analyze() {
         val bitmap = workingBitmap ?: return
-        runAnalysis(previousStage = CaptureStage.ReadyToAnalyze, fromVoice = false) { current ->
+        runAnalysis(previousStage = CaptureStage.ReadyToAnalyze, fromText = false) { current ->
             claude.analyzePhoto(current.apiKey, current.model, ImageUtils.encode(bitmap))
         }
     }
 
-    /** Analyze a transcribed spoken meal (voice logging). */
-    fun analyzeVoice(transcript: String) {
+    /** Analyze a typed or spoken meal description. */
+    fun analyzeDescription(text: String) {
         workingBitmap = null
-        runAnalysis(previousStage = CaptureStage.Empty, fromVoice = true) { current ->
-            claude.analyzeText(current.apiKey, current.model, transcript)
+        runAnalysis(previousStage = CaptureStage.Empty, fromText = true) { current ->
+            claude.analyzeText(current.apiKey, current.model, text)
         }
     }
 
     private fun runAnalysis(
         previousStage: CaptureStage,
-        fromVoice: Boolean,
+        fromText: Boolean,
         call: suspend (com.caloriescount.app.data.prefs.Settings) -> AnalysisOutcome
     ) {
         viewModelScope.launch {
@@ -148,7 +148,7 @@ class CaptureViewModel(
                 }
                 return@launch
             }
-            _state.update { it.copy(stage = CaptureStage.Analyzing, fromVoice = fromVoice, errorMessage = null) }
+            _state.update { it.copy(stage = CaptureStage.Analyzing, fromText = fromText, errorMessage = null) }
 
             when (val outcome = call(current)) {
                 is AnalysisOutcome.Success -> _state.update { it.toReviewing(outcome.analysis) }

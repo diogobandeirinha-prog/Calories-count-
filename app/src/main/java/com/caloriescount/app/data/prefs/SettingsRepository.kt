@@ -24,8 +24,8 @@ data class Settings(
     val syncEnabled: Boolean get() = syncBaseUrl.isNotBlank()
 
     companion object {
-        // Opus 4.8 — most capable model, best accuracy for portion/macro estimation.
-        const val DEFAULT_MODEL = "claude-opus-4-8"
+        // Claude Haiku 4.5 — fastest and cheapest model; works on free trial credits.
+        const val DEFAULT_MODEL = "claude-haiku-4-5"
     }
 }
 

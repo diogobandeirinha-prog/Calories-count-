@@ -106,10 +106,11 @@ fun SettingsScreen(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Claude API", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "The app uses Anthropic's Claude model to estimate calories and macros " +
-                            "(protein, carbs, fats) from your food photos and spoken meal descriptions. " +
-                            "Get a key at console.anthropic.com and paste it below. The default model " +
-                            "is Claude Opus 4.8 (most accurate). It is stored only on this device.",
+                        "The app uses Anthropic's Claude to estimate calories and macros from your " +
+                            "food photos and your typed/spoken meal descriptions. Get a key at " +
+                            "console.anthropic.com and paste it below — new accounts include free trial " +
+                            "credits. The default model is Claude Haiku 4.5 (cheapest & fastest); you can " +
+                            "switch to a more accurate model below. The key is stored only on this device.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

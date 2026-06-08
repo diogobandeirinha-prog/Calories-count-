@@ -27,9 +27,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -121,7 +123,7 @@ fun CaptureScreen(
                 ?.firstOrNull()
                 .orEmpty()
             previewUri = null
-            viewModel.analyzeVoice(transcript)
+            viewModel.analyzeDescription(transcript)
         }
     }
     val launchSpeech = {
@@ -141,6 +143,18 @@ fun CaptureScreen(
         }
     }
 
+    var showTypeDialog by remember { mutableStateOf(false) }
+    if (showTypeDialog) {
+        TypeMealDialog(
+            onDismiss = { showTypeDialog = false },
+            onConfirm = { text ->
+                previewUri = null
+                viewModel.analyzeDescription(text)
+                showTypeDialog = false
+            }
+        )
+    }
+
     LaunchedEffect(state.errorMessage, state.savedMessage) {
         state.errorMessage?.let { snackbarHost.showSnackbar(it) }
         state.savedMessage?.let { snackbarHost.showSnackbar(it) }
@@ -158,7 +172,7 @@ fun CaptureScreen(
         ) {
             Text("Log a meal", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
-            if (!state.fromVoice) {
+            if (!state.fromText) {
                 PhotoArea(previewUri = previewUri)
             }
 
@@ -185,13 +199,23 @@ fun CaptureScreen(
                 }
             }
 
-            OutlinedButton(
-                onClick = { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Filled.Mic, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Speak a meal")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Filled.Mic, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Speak")
+                }
+                OutlinedButton(
+                    onClick = { showTypeDialog = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Filled.Edit, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Type")
+                }
             }
 
             when (state.stage) {
@@ -207,15 +231,15 @@ fun CaptureScreen(
                 ) {
                     CircularProgressIndicator(Modifier.height(20.dp).width(20.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(12.dp))
-                    Text(if (state.fromVoice) "Parsing your meal…" else "Estimating calories & macros…")
+                    Text(if (state.fromText) "Parsing your meal…" else "Estimating calories & macros…")
                 }
 
                 CaptureStage.Reviewing -> ReviewSection(state, viewModel, onSaved)
                 CaptureStage.Empty -> {
                     Text(
-                        "Snap a photo of your dish, or tap “Speak a meal” and describe what you ate. " +
-                            "The app estimates each ingredient's weight, calories and macros, and you can " +
-                            "fine-tune the numbers before saving.",
+                        "Snap a photo of your dish, or tap “Speak” / “Type” to describe what you ate " +
+                            "(e.g. list every ingredient and amount). The app estimates each ingredient's " +
+                            "weight, calories and macros, and you can fine-tune the numbers before saving.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -226,6 +250,42 @@ fun CaptureScreen(
             }
         }
     }
+}
+
+@Composable
+private fun TypeMealDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(text.trim()) },
+                enabled = text.isNotBlank()
+            ) { Text("Analyze") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text("Type your meal") },
+        text = {
+            Column {
+                Text(
+                    "List the ingredients and amounts, e.g. \"150 g grilled chicken breast, " +
+                        "1 cup cooked white rice, 1 tbsp olive oil\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Ingredients") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                )
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

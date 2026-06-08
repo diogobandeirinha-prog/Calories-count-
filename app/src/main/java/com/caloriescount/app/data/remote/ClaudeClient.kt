@@ -78,7 +78,7 @@ class ClaudeClient(
             putJsonArray("content") {
                 addJsonObject {
                     put("type", "text")
-                    put("text", "$VOICE_PROMPT\n\nSpoken meal log:\n\"$transcript\"")
+                    put("text", "$DESCRIPTION_PROMPT\n\nMeal description:\n\"$transcript\"")
                 }
             }
         }
@@ -94,13 +94,20 @@ class ClaudeClient(
             return@withContext AnalysisOutcome.Error("No API key set. Add your Claude API key in Settings.")
         }
 
+        // Adaptive thinking + the effort parameter only exist on the newer "thinking"
+        // models (Opus 4.6+/Sonnet 4.6); they 400 on Haiku 4.5 and older. Structured
+        // outputs work everywhere, so they're always on.
+        val richReasoning = supportsThinkingAndEffort(model)
+
         val payload = buildJsonObject {
             put("model", model)
             put("max_tokens", 4096)
             put("system", SYSTEM_PROMPT)
-            putJsonObject("thinking") { put("type", "adaptive") }
+            if (richReasoning) {
+                putJsonObject("thinking") { put("type", "adaptive") }
+            }
             putJsonObject("output_config") {
-                put("effort", "high")
+                if (richReasoning) put("effort", "high")
                 putJsonObject("format") {
                     put("type", "json_schema")
                     put("schema", NUTRITION_SCHEMA)
@@ -184,6 +191,13 @@ class ClaudeClient(
         return null
     }
 
+    /** True for models that accept adaptive thinking + the `effort` parameter. */
+    private fun supportsThinkingAndEffort(model: String): Boolean {
+        val m = model.lowercase()
+        return m.contains("opus-4-6") || m.contains("opus-4-7") || m.contains("opus-4-8") ||
+            m.contains("sonnet-4-6")
+    }
+
     companion object {
         private val JSON_MEDIA = "application/json".toMediaType()
 
@@ -201,9 +215,9 @@ class ClaudeClient(
                 "(all in grams). Then provide the meal totals and a short note about your key " +
                 "assumptions. Give your single best estimate rather than a range."
 
-        private const val VOICE_PROMPT =
-            "Parse the following spoken meal description into structured food entries. For every " +
-                "food mentioned, resolve the stated portion (e.g. \"150 grams\", \"a cup of cooked " +
+        private const val DESCRIPTION_PROMPT =
+            "Parse the following meal description (typed or spoken) into structured food entries. " +
+                "For every food mentioned, resolve the stated portion (e.g. \"150 grams\", \"a cup of cooked " +
                 "white rice\", \"two eggs\") into an estimated weight in grams, then estimate its " +
                 "calories (kcal), protein, carbohydrates and fats (all in grams). Convert common " +
                 "household measures to grams using standard references. Then provide the meal " +

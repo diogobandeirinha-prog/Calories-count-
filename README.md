@@ -15,12 +15,12 @@ weekly and monthly** totals.
    **ingredient**, estimates its **weight in grams**, and returns precise
    **calories, protein, carbs and fats** per item plus meal totals.
 
-### 🎙️ Voice logging
-1. Tap **“Speak a meal”** and say something like
-   *“I had 150 grams of grilled chicken breast and a cup of cooked white rice.”*
-2. Android's speech recognizer transcribes it; **Claude parses the transcript**
-   into structured entries — resolving household measures (“a cup”) to grams and
-   estimating calories + macros for each food.
+### 🎙️ / ⌨️ Voice or typed logging
+1. Tap **“Speak”** and say — or **“Type”** and write — your meal, e.g.
+   *“150 g grilled chicken breast, 1 cup cooked white rice, 1 tbsp olive oil.”*
+2. Speech is transcribed on-device; either way **Claude parses the text** into
+   structured entries — resolving household measures (“a cup”) to grams and
+   estimating calories + macros for each ingredient.
 
 ### 🎯 Onboarding & dynamic goals
 On first launch a multi-step onboarding collects your **goal** (aggressive fat loss /
@@ -38,16 +38,17 @@ a protein bonus is added to your protein goal, updating "remaining" in real time
 
 ## Claude API design
 
-Both the photo and voice paths hit Anthropic's Messages API (`/v1/messages`)
+Both the photo and text paths hit Anthropic's Messages API (`/v1/messages`)
 with:
 
-- **Model `claude-opus-4-8`** — the most capable model, for best
-  portion/macro accuracy (configurable in Settings).
-- **Adaptive thinking** (`thinking: {type: "adaptive"}`) + **`effort: "high"`** —
-  the model reasons about portions before answering.
+- **Model `claude-haiku-4-5` by default** — cheapest and fastest, works on free
+  trial credits (configurable in Settings; pick Opus/Sonnet for more accuracy).
 - **Structured outputs** (`output_config.format` with a JSON schema) — the
   response is guaranteed-valid JSON matching the app's nutrition model, so there
-  is no brittle text parsing.
+  is no brittle text parsing. Works on all current models.
+- **Adaptive thinking + `effort: "high"`** are added **only** for models that
+  support them (Opus 4.6+/Sonnet 4.6); they're omitted on Haiku 4.5 (which would
+  otherwise 400).
 
 > Prompt caching is intentionally **not** used: the system prompt is well under
 > the model's ~4 K-token minimum cacheable prefix, so a cache breakpoint would
